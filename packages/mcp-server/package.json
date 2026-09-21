@@ -1,0 +1,23 @@
+{
+  "name": "@zcode-community/mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for local-first desktop automation.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "zcode-cua-mcp": "./dist/bin/server.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/bin/server.js 2>/dev/null || true",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@zcode-community/core": "workspace:*",
+    "@zcode-community/platform-macos": "workspace:*",
+    "@zcode-community/platform-windows": "workspace:*",
+    "@zcode-community/platform-linux": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

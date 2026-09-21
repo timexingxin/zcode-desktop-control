@@ -1,0 +1,87 @@
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { MCPServer, createPlatformAdapter } from "@zcode-community/mcp-server";
+import { runDoctor } from "./doctor.js";
+
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const cmd = argv[0] || "help";
+
+  switch (cmd) {
+    case "doctor": {
+      const isJson = argv.includes("--json");
+      const report = await runDoctor();
+      if (isJson) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+
+      console.log("\n=======================================================");
+      console.log(" ZCode Computer Use (CUA) Diagnostic Doctor Report");
+      console.log("=======================================================\n");
+
+      console.log(`[${report.checks.runtime.valid ? "PASS" : "FAIL"}] Node.js Runtime: v${report.checks.runtime.node_version} (>= 20 required)`);
+      console.log(`[${report.checks.os.supported ? "PASS" : "WARN"}] Operating System: ${report.checks.os.platform} (${report.checks.os.arch})`);
+      console.log(`[${report.checks.permissions.accessibility ? "PASS" : "WARN"}] Accessibility Permission: ${report.checks.permissions.accessibility ? "Granted" : "Not Granted / Untrusted"}`);
+      console.log(`[${report.checks.permissions.screen_recording ? "PASS" : "WARN"}] Screen Recording Permission: ${report.checks.permissions.screen_recording ? "Granted" : "Not Granted"}`);
+      console.log(`[${report.checks.zcode_integration.installed ? "PASS" : "INFO"}] ZCode Integration: ${report.checks.zcode_integration.installed ? `Detected (${report.checks.zcode_integration.app_path})` : "Standalone Mode (ZCode app not detected)"}`);
+      console.log(`[${report.checks.mcp.available ? "PASS" : "FAIL"}] MCP Tool Registry: ${report.checks.mcp.tools_count} standard tools loaded\n`);
+
+      console.log(`Overall Health Status: ${report.overall_healthy ? "HEALTHY - Ready for Agent automation" : "ATTENTION REQUIRED"}\n`);
+      break;
+    }
+
+    case "mcp": {
+      const server = new MCPServer();
+      server.startStdio();
+      break;
+    }
+
+    case "list-apps": {
+      const adapter = createPlatformAdapter();
+      const apps = await adapter.listApps();
+      console.log(JSON.stringify(apps, null, 2));
+      break;
+    }
+
+    case "screenshot": {
+      const adapter = createPlatformAdapter();
+      const outIdx = argv.indexOf("--output");
+      const outPath = outIdx !== -1 && argv[outIdx + 1] ? resolve(argv[outIdx + 1]) : null;
+
+      const shot = await adapter.takeScreenshot();
+      if (outPath) {
+        await writeFile(outPath, Buffer.from(shot.base64, "base64"));
+        console.log(`Screenshot saved to: ${outPath} (${shot.width}x${shot.height})`);
+      } else {
+        console.log(JSON.stringify({ width: shot.width, height: shot.height, base64_length: shot.base64.length }));
+      }
+      break;
+    }
+
+    case "version":
+    case "-v":
+    case "--version": {
+      console.log("zcode-desktop-control v0.1.0");
+      break;
+    }
+
+    case "help":
+    case "-h":
+    case "--help":
+    default: {
+      console.log(`
+ZCode Desktop Control CLI (cua) v0.1.0
+Independent, local-first Computer Use runtime and MCP bridge for AI agents.
+
+Usage:
+  cua doctor [--json]            Run environment, permissions, and tool diagnostics
+  cua mcp                        Start the stdio Model Context Protocol (MCP) server
+  cua list-apps                  List running desktop applications
+  cua screenshot [--output file] Take a diagnostic desktop screenshot
+  cua version                    Print version info
+  cua help                       Show this help message
+`);
+      break;
+    }
+  }
+}

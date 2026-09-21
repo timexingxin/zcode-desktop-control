@@ -1,0 +1,19 @@
+{
+  "name": "zcode-desktop-control",
+  "version": "0.1.0",
+  "description": "Community-built local-first Computer Use runtime and MCP integration for ZCode and AI agents.",
+  "author": {
+    "name": "ZCode Community Contributors",
+    "url": "https://github.com/timexingxin/zcode-desktop-control"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "mcpServers": {
+    "computer-use": {
+      "command": "node",
+      "args": ["${PLUGIN_DIR}/../packages/mcp-server/dist/bin/server.js"],
+      "timeoutMs": 60000,
+      "env": {}
+    }
+  }
+}

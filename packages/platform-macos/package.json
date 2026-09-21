@@ -1,0 +1,17 @@
+{
+  "name": "@zcode-community/platform-macos",
+  "version": "0.1.0",
+  "description": "macOS native Accessibility (AX) and CoreGraphics adapter for Computer Use.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@zcode-community/core": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}
