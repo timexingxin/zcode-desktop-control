@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --recursive --filter \"./packages/*\" run build",
-    "test": "node --test tests/**/*.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "typecheck": "pnpm --recursive --filter \"./packages/*\" run typecheck",
     "lint": "node scripts/lint.mjs",
     "clean": "pnpm --recursive --filter \"./packages/*\" run clean 2>/dev/null || true",
