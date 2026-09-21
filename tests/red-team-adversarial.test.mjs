@@ -8,6 +8,7 @@ import {
   UnsupportedPlatformError,
 } from "../packages/core/dist/index.js";
 import { MCPServer } from "../packages/mcp-server/dist/index.js";
+import { MacOSAdapter } from "../packages/platform-macos/dist/index.js";
 import { WindowsAdapter } from "../packages/platform-windows/dist/index.js";
 
 test("Red Team 1: Duplicate element names trigger AmbiguousElementError and prevent blind action", async () => {
@@ -51,7 +52,7 @@ test("Red Team 1: Duplicate element names trigger AmbiguousElementError and prev
 });
 
 test("Red Team 2: Stale State or Missing Handle throws StaleHandleError, never fake-success", async () => {
-  const server = new MCPServer();
+  const server = new MCPServer(new MacOSAdapter());
   const res = await server.handleCallTool("click", {
     target: {
       type: "element",

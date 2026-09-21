@@ -13,6 +13,11 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
     return;
   }
 
+  if (process.env.CI || process.env.GITHUB_ACTIONS) {
+    t.skip("Headless CI runner does not have an active Aqua GUI window server session");
+    return;
+  }
+
   const adapter = new MacOSAdapter();
   const server = new MCPServer(adapter);
 
