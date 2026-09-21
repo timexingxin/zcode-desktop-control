@@ -7,25 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0-alpha.1] - 2026-09-21
+
+### Engineering Remediation & Truthful Runtime Release
+
+Transitioned project from an architecture prototype to a truthful, testable, real-world Computer Use runtime adhering to the **Zero Fake-Success Policy**.
+
+### Fixed & Implemented
+- **GitHub Actions CI Pipeline**: Fixed root cause of Node 20.x CI failure caused by `pnpm@11` `node:sqlite` dependency; pinned compatible pnpm and disabled `fail-fast` for transparent matrix visibility.
+- **Zero Fake-Success Policy**: Eliminated all unexecuted stubs across all adapters and MCP tools. Windows and Linux skeletons now strictly throw `UnsupportedPlatformError` rather than returning synthetic success receipts.
+- **Real macOS Implementation**:
+  - `movePointer`: Dispatches native CoreGraphics `kCGEventMouseMoved` events.
+  - `click`: Dispatches real CoreGraphics mouse events supporting `left`, `right`, and `middle` buttons, plus `clickCount` (1x, 2x, 3x).
+  - `drag`: Dispatches real `kCGEventLeftMouseDragged` events.
+  - `scroll`: Dispatches pixel-level `CGEventCreateScrollWheelEvent2` events.
+  - `screenshot`: Parses actual PNG IHDR chunk headers (bytes 16..24) for exact dimensions rather than returning hardcoded 1080p values.
+  - `get_screen_info`: Queries live display resolution and multi-monitor counts via `CGMainDisplayID` and `NSScreen`.
+  - `listWindows`: Retrieves authentic `CGWindowID` numbers via `CGWindowListCopyWindowInfo`.
+  - `read_clipboard` / `write_clipboard`: Native `pbpaste` and `pbcopy` stdin stream pipes.
+- **Stable Handle V2 & Hierarchy Preservation**:
+  - Full state preserves true recursive AX tree hierarchy (`UIElement` with nested `children`).
+  - Separated `StrongHandle` (derived from persistent `AXIdentifier` / `AutomationId`) from `WeakHandle` (derived from role hierarchy and semantic fingerprints without volatile sibling indices).
+  - Added collision and ambiguity detection (`AmbiguousElementError`).
+- **MCP Protocol Modernization**:
+  - Aligned with the 2026-07-28 Model Context Protocol specification.
+  - Implemented automated protocol version negotiation (`2026-07-28` modern, `2024-11-05` legacy fallback).
+  - Added `get_capabilities` tool to expose the `PlatformCapabilityRegistry`.
+- **Self-Contained ZCode Plugin Packaging**:
+  - Standardized on `${ZCODE_PLUGIN_ROOT}` and `.mcp.json`.
+  - Automated bundling into `dist/zcode-desktop-control.zip` with verified standalone execution in clean `/tmp` directories.
+- **Real GUI E2E Testing**:
+  - Added `tests/gui-e2e-textedit.test.mjs`: validates real TextEdit launching, typing, OS state verification, and window teardown.
+  - Added `tests/red-team-adversarial.test.mjs`: 7 adversarial test cases covering duplicate element collision, expired state rejection, and kill-switch enforcement.
+- **Measured Token Compression Benchmarks**:
+  - Published reproducible benchmark script `scripts/benchmark-compression.mjs`.
+  - Documented median character reduction (Compact: 53.17%, Diff: 99.03%) with honest min/max ranges.
+- **Governance & Privacy Disclosures**:
+  - Updated `THIRD_PARTY_NOTICES.md` with Linux Foundation (LF Projects) governance notes.
+  - Configured git noreply identity.
+
+---
+
 ## [0.1.0] - 2026-09-21
 
-### Initial Open-Source Release
+### Initial Architecture Prototype (Pre-release)
 
-This is the initial open-source community release of `zcode-desktop-control`: an independent, local-first Computer Use runtime and MCP integration for ZCode and AI agents.
-
-### What Works
-- **Clean-Room Core Architecture**: Completely free of closed-source proprietary binaries and decompiled assets.
-- **Model Context Protocol (MCP)**: Full stdio JSON-RPC 2.0 server exposing 30+ standardized Computer Use tools.
-- **Accessibility-First Operations**: Semantic tree inspection, element actions (`AXPress`, `setValue`), and stable handles avoiding fragile index drifts.
-- **Token Efficiency**: `compact` and `diff` state detail modes pruning non-interactive noise.
-- **Structured Error Taxonomy**: Granular `PermissionDeniedError`, `ElementNotFoundError`, `StaleHandleError`, `WindowNotFoundError`, and `TimeoutError`.
-- **Diagnostic CLI (`cua`)**: `cua doctor`, `cua mcp`, `cua list-apps`, `cua screenshot`.
-- **ZCode Plugin Compatibility**: Native `.zcode-plugin/plugin.json` manifest and concise `computer-use` skill.
-
-### Tested Environments
-- **macOS Sequoia (15.x, Apple Silicon arm64)**: Fully verified and smoke-tested.
-- **Node.js**: v20.x, v22.x.
-
-### Known Limitations
-- Windows UI Automation and Linux AT-SPI2 implementations are architecturally structured but require live native hardware validation for full parity.
-- macOS requires explicit user grants in System Settings for Accessibility and Screen Recording.
+Initial open-source community prototype of `zcode-desktop-control`. Replaced proprietary helper binaries with clean-room TypeScript monorepo architecture.

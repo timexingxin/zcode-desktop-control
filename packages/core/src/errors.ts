@@ -99,3 +99,10 @@ export class HelperUnavailableError extends ComputerUseError {
     this.name = "HelperUnavailableError";
   }
 }
+
+export class AmbiguousElementError extends ComputerUseError {
+  constructor(message: string, readonly candidates?: any[]) {
+    super(`Ambiguous element: ${message}`, "ambiguous_element", true, false);
+    this.name = "AmbiguousElementError";
+  }
+}

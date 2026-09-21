@@ -1,8 +1,12 @@
 import { createInterface } from "node:readline";
 import {
   type PlatformAdapter,
+  AmbiguousElementError,
   ComputerUseError,
+  ElementNotFoundError,
+  UnsupportedPlatformError,
   computeStateDiff,
+  getPlatformCapabilities,
   reduceToCompactState,
 } from "@zcode-community/core";
 import { MacOSAdapter } from "@zcode-community/platform-macos";
@@ -26,6 +30,7 @@ export function createPlatformAdapter(): PlatformAdapter {
 export class MCPServer {
   private adapter: PlatformAdapter;
   private lastStateMap = new Map<string, any>();
+  private isControlHalted = false;
 
   constructor(adapter?: PlatformAdapter) {
     this.adapter = adapter || createPlatformAdapter();
@@ -69,7 +74,23 @@ export class MCPServer {
   }
 
   private async dispatchTool(name: string, args: Record<string, any>): Promise<any> {
+    if (
+      this.isControlHalted &&
+      name !== "stop_computer_control" &&
+      name !== "get_capabilities" &&
+      name !== "wait"
+    ) {
+      throw new ComputerUseError(
+        "Computer control session was halted by kill-switch. Restart server to resume.",
+        "operation_failed"
+      );
+    }
+
     switch (name) {
+      // --- Capability Registry ---
+      case "get_capabilities":
+        return getPlatformCapabilities(this.adapter.platform);
+
       // --- Observation ---
       case "list_apps":
         return await this.adapter.listApps();
@@ -103,11 +124,10 @@ export class MCPServer {
         return await this.adapter.takeScreenshot(args);
 
       case "get_screen_info":
-        return {
-          displays: 1,
-          main_display: { width: 1920, height: 1080, scale: 2 },
-          platform: this.adapter.platform,
-        };
+        if (this.adapter.getScreenInfo) {
+          return await this.adapter.getScreenInfo();
+        }
+        throw new UnsupportedPlatformError("get_screen_info", this.adapter.platform);
 
       // --- Pointer ---
       case "click":
@@ -138,15 +158,24 @@ export class MCPServer {
         return await this.adapter.scroll(args);
 
       case "left_click_drag":
-        return await this.adapter.movePointer(args.x, args.y);
+        if (this.adapter.drag) {
+          return await this.adapter.drag(args.toX ?? args.x, args.toY ?? args.y, args.fromX, args.fromY);
+        }
+        throw new UnsupportedPlatformError("left_click_drag", this.adapter.platform);
 
       case "mouse_down":
       case "left_mouse_down":
-        return { ok: true, action: "mouse_down", action_sent: true, receipt: "Mouse button depressed" };
+        if (this.adapter.mouseDown) {
+          return await this.adapter.mouseDown(args.button || "left");
+        }
+        throw new UnsupportedPlatformError("mouse_down", this.adapter.platform);
 
       case "mouse_up":
       case "left_mouse_up":
-        return { ok: true, action: "mouse_up", action_sent: true, receipt: "Mouse button released" };
+        if (this.adapter.mouseUp) {
+          return await this.adapter.mouseUp(args.button || "left");
+        }
+        throw new UnsupportedPlatformError("mouse_up", this.adapter.platform);
 
       // --- Text & Keyboard ---
       case "type_text":
@@ -167,7 +196,7 @@ export class MCPServer {
         return await this.adapter.setValue(args.target, args.value);
 
       case "select_text":
-        return { ok: true, action: "select_text", action_sent: true, receipt: "Selected text" };
+        throw new UnsupportedPlatformError("select_text", this.adapter.platform);
 
       // --- Window & App ---
       case "launch_app":
@@ -207,8 +236,15 @@ export class MCPServer {
       case "click_element": {
         const state = await this.adapter.getAppState(args.app_ref, { detail: "compact" });
         const compact = reduceToCompactState(state);
-        const match = compact.elements.find((e) => e.n.toLowerCase().includes(args.name.toLowerCase()));
-        if (!match) throw new ComputerUseError(`Element "${args.name}" not found`, "element_not_found");
+        const matches = compact.elements.filter((e) => e.n.toLowerCase().includes(args.name.toLowerCase()));
+        if (matches.length === 0) throw new ElementNotFoundError(`Element "${args.name}" not found`);
+        if (matches.length > 1) {
+          throw new AmbiguousElementError(
+            `Found ${matches.length} elements matching "${args.name}". Specify unique handle.`,
+            matches
+          );
+        }
+        const match = matches[0];
         return await this.adapter.click({
           type: "element",
           state_id: state.state_id,
@@ -220,8 +256,15 @@ export class MCPServer {
       case "set_element_value": {
         const state = await this.adapter.getAppState(args.app_ref, { detail: "compact" });
         const compact = reduceToCompactState(state);
-        const match = compact.elements.find((e) => e.n.toLowerCase().includes(args.name.toLowerCase()));
-        if (!match) throw new ComputerUseError(`Element "${args.name}" not found`, "element_not_found");
+        const matches = compact.elements.filter((e) => e.n.toLowerCase().includes(args.name.toLowerCase()));
+        if (matches.length === 0) throw new ElementNotFoundError(`Element "${args.name}" not found`);
+        if (matches.length > 1) {
+          throw new AmbiguousElementError(
+            `Found ${matches.length} elements matching "${args.name}". Specify unique handle.`,
+            matches
+          );
+        }
+        const match = matches[0];
         return await this.adapter.setValue(
           { type: "element", state_id: state.state_id, index: match.i, handle: match.h },
           args.value
@@ -236,6 +279,7 @@ export class MCPServer {
         return await this.adapter.requestAccess(args.types);
 
       case "stop_computer_control":
+        this.isControlHalted = true;
         return { ok: true, action: "stop_computer_control", receipt: "Control session halted via kill-switch" };
 
       case "wait":
@@ -243,10 +287,18 @@ export class MCPServer {
         return { ok: true, waited_ms: args.ms || 1000 };
 
       case "read_clipboard":
-        return { text: "" };
+        if (this.adapter.readClipboard) {
+          const text = await this.adapter.readClipboard();
+          return { text };
+        }
+        throw new UnsupportedPlatformError("read_clipboard", this.adapter.platform);
 
       case "write_clipboard":
-        return { ok: true, text: args.text };
+        if (this.adapter.writeClipboard) {
+          await this.adapter.writeClipboard(args.text);
+          return { ok: true, text: args.text };
+        }
+        throw new UnsupportedPlatformError("write_clipboard", this.adapter.platform);
 
       default:
         throw new ComputerUseError(`Tool not recognized: ${name}`, "invalid_argument");
@@ -272,19 +324,23 @@ export class MCPServer {
         const req = JSON.parse(trimmed);
         const { id, method, params } = req;
 
-        // Protocol handshake
+        // Protocol handshake with version negotiation
         if (method === "initialize") {
+          const requestedProto = params?.protocolVersion || "2024-11-05";
+          const negotiatedVersion =
+            requestedProto === "2026-07-28" || requestedProto >= "2025" ? "2026-07-28" : "2024-11-05";
+
           sendResponse({
             jsonrpc: "2.0",
             id,
             result: {
-              protocolVersion: "2024-11-05",
+              protocolVersion: negotiatedVersion,
               capabilities: {
                 tools: { listChanged: false },
               },
               serverInfo: {
                 name: "zcode-desktop-control",
-                version: "0.1.0",
+                version: "0.2.0-alpha.1",
               },
             },
           });
@@ -292,7 +348,6 @@ export class MCPServer {
         }
 
         if (method === "notifications/initialized") {
-          // No reply required
           return;
         }
 

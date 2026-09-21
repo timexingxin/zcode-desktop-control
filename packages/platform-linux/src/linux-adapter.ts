@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   type ActionResult,
   type AppInfo,
@@ -10,13 +9,19 @@ import {
   type ScrollOptions,
   type Target,
   type TypeOptions,
-  type UIElement,
   type WindowInfo,
-  assignHandlesToTree,
+  UnsupportedPlatformError,
 } from "@zcode-community/core";
 
+/**
+ * Linux Platform Adapter.
+ * Status: Experimental / Skeleton.
+ * In accordance with the Zero Fake-Success Policy (Option B), operations that
+ * are not yet verified on live Linux hardware throw UnsupportedPlatformError.
+ */
 export class LinuxAdapter implements PlatformAdapter {
   readonly platform = "linux" as const;
+  readonly status = "experimental" as const;
 
   async listApps(): Promise<AppInfo[]> {
     return [];
@@ -31,33 +36,10 @@ export class LinuxAdapter implements PlatformAdapter {
   }
 
   async getAppState(
-    appRef: AppRef,
+    _appRef: AppRef,
     _options: { detail?: "compact" | "full"; include_screenshot?: boolean } = {}
   ): Promise<AppState> {
-    const dummyElements: UIElement[] = [
-      {
-        index: 0,
-        handle: "h_window_0",
-        role: "window",
-        name: appRef.name || "LinuxWindow",
-        capabilities: ["focused"],
-        actions: ["close"],
-      },
-    ];
-    const windowId = appRef.window_id ?? 1000;
-    const tree = assignHandlesToTree(windowId, dummyElements);
-
-    return {
-      state_id: `s_${randomUUID().slice(0, 8)}`,
-      app: {
-        pid: appRef.pid || 1000,
-        name: appRef.name || "LinuxApp",
-        active: true,
-      },
-      tree,
-      element_count: tree.length,
-      timestamp: Date.now(),
-    };
+    throw new UnsupportedPlatformError("getAppState (AT-SPI2)", "linux");
   }
 
   async takeScreenshot(_options?: { window_id?: number; display_id?: number }): Promise<{
@@ -65,133 +47,85 @@ export class LinuxAdapter implements PlatformAdapter {
     width: number;
     height: number;
   }> {
-    return {
-      base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      width: 1920,
-      height: 1080,
-    };
+    throw new UnsupportedPlatformError("takeScreenshot", "linux");
   }
 
-  async launchApp(nameOrBundleId: string, _activate = true): Promise<AppInfo> {
-    return { pid: 0, name: nameOrBundleId, active: true };
+  async launchApp(_nameOrBundleId: string, _activate = true): Promise<AppInfo> {
+    throw new UnsupportedPlatformError("launchApp", "linux");
   }
 
   async focusApp(_appRef: AppRef): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("focusApp", "linux");
   }
 
   async focusWindow(_windowId: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("focusWindow", "linux");
   }
 
   async moveWindow(_windowId: number, _x: number, _y: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("moveWindow", "linux");
   }
 
   async resizeWindow(_windowId: number, _width: number, _height: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("resizeWindow", "linux");
   }
 
   async minimizeWindow(_windowId: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("minimizeWindow", "linux");
   }
 
   async maximizeWindow(_windowId: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("maximizeWindow", "linux");
   }
 
-  async click(target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "click",
-      action_sent: true,
-      receipt: `Linux clicked target`,
-      target,
-    };
+  async click(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("click", "linux");
   }
 
-  async doubleClick(target: Target, options: ClickOptions = {}): Promise<ActionResult> {
-    return this.click(target, { ...options, clickCount: 2 });
+  async doubleClick(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("double_click", "linux");
   }
 
-  async rightClick(target: Target, options: ClickOptions = {}): Promise<ActionResult> {
-    return this.click(target, { ...options, button: "right" });
+  async rightClick(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("right_click", "linux");
   }
 
-  async movePointer(x: number, y: number): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "move_pointer",
-      action_sent: true,
-      receipt: `Linux moved pointer to (${x}, ${y})`,
-    };
+  async movePointer(_x: number, _y: number): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("move_pointer", "linux");
   }
 
   async scroll(_options: ScrollOptions): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "scroll",
-      action_sent: true,
-      receipt: `Linux scrolled`,
-    };
+    throw new UnsupportedPlatformError("scroll", "linux");
   }
 
-  async typeText(text: string, _options?: TypeOptions, target?: Target): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "type_text",
-      action_sent: true,
-      receipt: `Linux typed ${text.length} characters`,
-      target,
-    };
+  async typeText(_text: string, _options?: TypeOptions, _target?: Target): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("type_text", "linux");
   }
 
-  async pressKey(key: string, modifiers: string[] = []): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "press_key",
-      action_sent: true,
-      receipt: `Linux pressed key ${key} with ${modifiers.join("+")}`,
-    };
+  async pressKey(_key: string, _modifiers: string[] = []): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("press_key", "linux");
   }
 
-  async hotkey(keys: string[]): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "hotkey",
-      action_sent: true,
-      receipt: `Linux hotkey: ${keys.join("+")}`,
-    };
+  async hotkey(_keys: string[]): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("hotkey", "linux");
   }
 
-  async setValue(target: Target, value: string): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "set_value",
-      action_sent: true,
-      receipt: `Linux set value to "${value}"`,
-      target,
-    };
+  async setValue(_target: Target, _value: string): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("set_value", "linux");
   }
 
-  async performAction(target: Target, actionName: string): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "perform_action",
-      action_sent: true,
-      receipt: `Linux performed action "${actionName}"`,
-      target,
-    };
+  async performAction(_target: Target, _actionName: string): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("perform_action", "linux");
   }
 
   async checkPermissions(): Promise<PermissionReport> {
     return {
-      accessibility: true,
-      screen_recording: true,
+      accessibility: false,
+      screen_recording: false,
     };
   }
 
-  async requestAccess(_types?: ("accessibility" | "screen_recording")[]): Promise<PermissionReport> {
+  async requestAccess(): Promise<PermissionReport> {
     return this.checkPermissions();
   }
 }

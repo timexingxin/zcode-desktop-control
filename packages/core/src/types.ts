@@ -44,12 +44,18 @@ export interface UIElement {
   index: number;
   handle: string;
   role: string;
+  subrole?: string;
+  identifier?: string;
   name: string;
   value?: string;
   bounds?: Rectangle;
+  enabled?: boolean;
+  focused?: boolean;
   capabilities: string[];
   actions: string[];
   children?: UIElement[];
+  ambiguous?: boolean;
+  ambiguity_count?: number;
 }
 
 export interface CompactUIElement {
@@ -184,6 +190,20 @@ export interface PlatformAdapter {
   setValue(target: Target, value: string): Promise<ActionResult>;
   performAction(target: Target, actionName: string): Promise<ActionResult>;
   
+  // Pointer Extensions
+  mouseDown?(button?: "left" | "right" | "middle"): Promise<ActionResult>;
+  mouseUp?(button?: "left" | "right" | "middle"): Promise<ActionResult>;
+  drag?(toX: number, toY: number, fromX?: number, fromY?: number): Promise<ActionResult>;
+
+  // Clipboard & Screen Information
+  readClipboard?(): Promise<string>;
+  writeClipboard?(text: string): Promise<boolean>;
+  getScreenInfo?(): Promise<{
+    displays: number;
+    main_display: { width: number; height: number; scale: number };
+    platform: string;
+  }>;
+
   // System & Permission
   checkPermissions(): Promise<PermissionReport>;
   requestAccess(types?: ("accessibility" | "screen_recording")[]): Promise<PermissionReport>;

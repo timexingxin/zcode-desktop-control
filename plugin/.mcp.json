@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "computer-use": {
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/bin/server.js"],
+      "timeoutMs": 60000
+    }
+  }
+}

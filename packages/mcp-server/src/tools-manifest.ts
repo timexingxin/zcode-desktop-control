@@ -511,4 +511,12 @@ export const TOOLS_MANIFEST: ToolDefinition[] = [
       required: ["text"],
     },
   },
+  {
+    name: "get_capabilities",
+    description: "Query runtime feature support and platform capability registry (Zero Fake-Success contract).",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
 ];

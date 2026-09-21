@@ -17,7 +17,7 @@ test("Stable Element Handle Generation is deterministic", () => {
   assert.equal(h1, h2, "Identical elements must produce identical handles");
   assert.notEqual(h1, h3, "Different names must produce different handles");
   assert.notEqual(h1, h4, "Different windows must produce different handles");
-  assert.match(h1, /^h_button_[a-f0-9]{10}$/, "Handle must follow stable format");
+  assert.match(h1, /^h_(wk|str)_button_[a-f0-9]{10}$/, "Handle must follow stable format");
 });
 
 test("Tree Handle Assignment and Lookup", () => {

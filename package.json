@@ -1,6 +1,6 @@
 {
   "name": "zcode-desktop-control-monorepo",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "description": "Local-first desktop automation for AI agents, with first-class ZCode and MCP integration.",
   "type": "module",
@@ -11,13 +11,15 @@
     "lint": "node scripts/lint.mjs",
     "clean": "pnpm --recursive --filter \"./packages/*\" run clean 2>/dev/null || true",
     "doctor": "node packages/cli/bin/cua.mjs doctor",
-    "smoke-test": "node scripts/smoke-test.mjs"
+    "smoke-test": "node scripts/smoke-test.mjs",
+    "package:plugin": "node scripts/package-plugin.mjs",
+    "benchmark": "node scripts/benchmark-compression.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
     "typescript": "^5.8.2"
   },
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=20.0.0"
   },

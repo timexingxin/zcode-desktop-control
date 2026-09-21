@@ -1,6 +1,6 @@
 {
   "name": "@zcode-community/core",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "description": "Core models, stable handles, state compression, and error taxonomy for Computer Use.",
   "type": "module",
   "main": "./dist/index.js",

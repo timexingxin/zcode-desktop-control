@@ -1,6 +1,6 @@
 {
   "name": "@zcode-community/platform-macos",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "description": "macOS native Accessibility (AX) and CoreGraphics adapter for Computer Use.",
   "type": "module",
   "main": "./dist/index.js",

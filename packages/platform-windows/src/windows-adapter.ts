@@ -1,5 +1,4 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import {
   type ActionResult,
@@ -12,18 +11,22 @@ import {
   type ScrollOptions,
   type Target,
   type TypeOptions,
-  type UIElement,
   type WindowInfo,
-  AppNotFoundError,
   ComputerUseError,
   UnsupportedPlatformError,
-  assignHandlesToTree,
 } from "@zcode-community/core";
 
 const execFile = promisify(execFileCallback);
 
+/**
+ * Windows Platform Adapter.
+ * Status: Experimental / Skeleton.
+ * In accordance with the Zero Fake-Success Policy (Option B), operations that
+ * are not yet verified on live Windows hardware throw UnsupportedPlatformError.
+ */
 export class WindowsAdapter implements PlatformAdapter {
   readonly platform = "win32" as const;
+  readonly status = "experimental" as const;
 
   private isWindows = process.platform === "win32";
 
@@ -84,47 +87,10 @@ export class WindowsAdapter implements PlatformAdapter {
   }
 
   async getAppState(
-    appRef: AppRef,
+    _appRef: AppRef,
     _options: { detail?: "compact" | "full"; include_screenshot?: boolean } = {}
   ): Promise<AppState> {
-    const apps = await this.listApps();
-    const app = apps.find(
-      (a) =>
-        (appRef.pid && a.pid === appRef.pid) ||
-        (appRef.name && a.name.toLowerCase() === appRef.name.toLowerCase())
-    );
-
-    if (!app && this.isWindows) {
-      throw new AppNotFoundError(appRef.name || String(appRef.pid));
-    }
-
-    const resolvedApp = app || {
-      pid: appRef.pid || 1000,
-      name: appRef.name || "MockWindowsApp",
-      active: true,
-    };
-
-    const dummyElements: UIElement[] = [
-      {
-        index: 0,
-        handle: "h_window_0",
-        role: "window",
-        name: resolvedApp.name,
-        capabilities: ["focused"],
-        actions: ["close", "minimize"],
-      },
-    ];
-
-    const windowId = appRef.window_id ?? resolvedApp.pid * 1000;
-    const tree = assignHandlesToTree(windowId, dummyElements);
-
-    return {
-      state_id: `s_${randomUUID().slice(0, 8)}`,
-      app: resolvedApp,
-      tree,
-      element_count: tree.length,
-      timestamp: Date.now(),
-    };
+    throw new UnsupportedPlatformError("getAppState (UIAutomation)", "win32");
   }
 
   async takeScreenshot(_options?: { window_id?: number; display_id?: number }): Promise<{
@@ -132,145 +98,108 @@ export class WindowsAdapter implements PlatformAdapter {
     width: number;
     height: number;
   }> {
-    if (!this.isWindows) {
-      throw new UnsupportedPlatformError("takeScreenshot", process.platform);
-    }
-    return {
-      base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      width: 1920,
-      height: 1080,
-    };
+    throw new UnsupportedPlatformError("takeScreenshot", "win32");
   }
 
-  async launchApp(nameOrBundleId: string, _activate = true): Promise<AppInfo> {
+  async launchApp(nameOrPath: string): Promise<AppInfo> {
     if (!this.isWindows) {
       throw new UnsupportedPlatformError("launchApp", process.platform);
     }
-    await execFile("cmd.exe", ["/c", "start", "", nameOrBundleId]);
-    return { pid: 0, name: nameOrBundleId, active: true };
+    await this.runPowerShell(`Start-Process "${nameOrPath}"`);
+    return {
+      pid: 0,
+      name: nameOrPath,
+      active: true,
+    };
   }
 
   async focusApp(appRef: AppRef): Promise<boolean> {
-    if (!this.isWindows) return false;
+    if (!this.isWindows) {
+      throw new UnsupportedPlatformError("focusApp", process.platform);
+    }
+    const filter = appRef.pid ? `Id -eq ${appRef.pid}` : `ProcessName -eq '${appRef.name}'`;
     const ps = `
-      $p = Get-Process -Id ${appRef.pid}; if ($p) { (New-Object -ComObject WScript.Shell).AppActivate($p.Id) }
+      $proc = Get-Process | Where-Object { ${filter} } | Select-Object -First 1
+      if ($proc -and $proc.MainWindowHandle) {
+        $sig = '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'
+        $type = Add-Type -MemberDefinition $sig -Name "Win32Util" -Namespace "ZCode" -PassThru
+        $type::SetForegroundWindow($proc.MainWindowHandle)
+      } else {
+        $false
+      }
     `;
-    await this.runPowerShell(ps).catch(() => false);
-    return true;
+    const res = await this.runPowerShell<boolean>(ps).catch(() => false);
+    return !!res;
   }
 
-  async focusWindow(windowId: number): Promise<boolean> {
-    return this.focusApp({ pid: Math.floor(windowId / 1000) });
+  async focusWindow(_windowId: number): Promise<boolean> {
+    throw new UnsupportedPlatformError("focusWindow", "win32");
   }
 
   async moveWindow(_windowId: number, _x: number, _y: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("moveWindow", "win32");
   }
 
   async resizeWindow(_windowId: number, _width: number, _height: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("resizeWindow", "win32");
   }
 
   async minimizeWindow(_windowId: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("minimizeWindow", "win32");
   }
 
   async maximizeWindow(_windowId: number): Promise<boolean> {
-    return true;
+    throw new UnsupportedPlatformError("maximizeWindow", "win32");
   }
 
-  async click(target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "click",
-      action_sent: true,
-      receipt: `Windows clicked target`,
-      target,
-    };
+  async click(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("click", "win32");
   }
 
-  async doubleClick(target: Target, options: ClickOptions = {}): Promise<ActionResult> {
-    return this.click(target, { ...options, clickCount: 2 });
+  async doubleClick(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("double_click", "win32");
   }
 
-  async rightClick(target: Target, options: ClickOptions = {}): Promise<ActionResult> {
-    return this.click(target, { ...options, button: "right" });
+  async rightClick(_target: Target, _options: ClickOptions = {}): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("right_click", "win32");
   }
 
-  async movePointer(x: number, y: number): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "move_pointer",
-      action_sent: true,
-      receipt: `Windows moved pointer to (${x}, ${y})`,
-    };
+  async movePointer(_x: number, _y: number): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("move_pointer", "win32");
   }
 
   async scroll(_options: ScrollOptions): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "scroll",
-      action_sent: true,
-      receipt: `Windows scrolled`,
-    };
+    throw new UnsupportedPlatformError("scroll", "win32");
   }
 
-  async typeText(text: string, _options?: TypeOptions, target?: Target): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "type_text",
-      action_sent: true,
-      receipt: `Windows typed ${text.length} characters`,
-      target,
-    };
+  async typeText(_text: string, _options?: TypeOptions, _target?: Target): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("type_text", "win32");
   }
 
-  async pressKey(key: string, modifiers: string[] = []): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "press_key",
-      action_sent: true,
-      receipt: `Windows pressed key ${key} with ${modifiers.join("+")}`,
-    };
+  async pressKey(_key: string, _modifiers: string[] = []): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("press_key", "win32");
   }
 
-  async hotkey(keys: string[]): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "hotkey",
-      action_sent: true,
-      receipt: `Windows hotkey: ${keys.join("+")}`,
-    };
+  async hotkey(_keys: string[]): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("hotkey", "win32");
   }
 
-  async setValue(target: Target, value: string): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "set_value",
-      action_sent: true,
-      receipt: `Windows set value to "${value}"`,
-      target,
-    };
+  async setValue(_target: Target, _value: string): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("set_value", "win32");
   }
 
-  async performAction(target: Target, actionName: string): Promise<ActionResult> {
-    return {
-      ok: true,
-      action: "perform_action",
-      action_sent: true,
-      receipt: `Windows performed action "${actionName}"`,
-      target,
-    };
+  async performAction(_target: Target, _actionName: string): Promise<ActionResult> {
+    throw new UnsupportedPlatformError("perform_action", "win32");
   }
 
   async checkPermissions(): Promise<PermissionReport> {
     return {
-      accessibility: true,
-      screen_recording: true,
+      accessibility: false,
+      screen_recording: false,
     };
   }
 
-  async requestAccess(_types?: ("accessibility" | "screen_recording")[]): Promise<PermissionReport> {
+  async requestAccess(): Promise<PermissionReport> {
     return this.checkPermissions();
   }
 }
