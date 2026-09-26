@@ -6,6 +6,9 @@ import { createPlatformAdapter, TOOLS_MANIFEST } from "@zcode-community/mcp-serv
 export interface DoctorReport {
   timestamp: string;
   overall_healthy: boolean;
+  core_ready: boolean;
+  real_gui_ready: boolean;
+  missing_real_gui_prereqs: string[];
   checks: {
     runtime: {
       node_version: string;
@@ -19,6 +22,12 @@ export interface DoctorReport {
     permissions: {
       accessibility: boolean;
       screen_recording: boolean;
+    };
+    environment: {
+      gui_session: boolean;
+      window_server: boolean;
+      coregraphics_ready: boolean;
+      textedit_available: boolean;
     };
     zcode_integration: {
       installed: boolean;
@@ -38,6 +47,35 @@ export async function runDoctor(): Promise<DoctorReport> {
     accessibility: false,
     screen_recording: false,
   }));
+
+  // Check GUI session, WindowServer, TextEdit, CoreGraphics
+  let windowServerAlive = false;
+  let guiSessionActive = false;
+  let coregraphicsReady = false;
+  let texteditAvailable = false;
+
+  if (process.platform === "darwin") {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      try {
+        execFileSync("pgrep", ["-x", "WindowServer"]);
+        windowServerAlive = true;
+      } catch (_) {}
+
+      guiSessionActive = windowServerAlive && !process.env.CI && !process.env.GITHUB_ACTIONS;
+
+      const textEditCandidates = [
+        "/System/Applications/TextEdit.app",
+        "/Applications/TextEdit.app",
+        join(homedir(), "Applications/TextEdit.app"),
+      ];
+      texteditAvailable = textEditCandidates.some((p) => existsSync(p));
+      coregraphicsReady = windowServerAlive;
+    } catch (_) {}
+  } else {
+    guiSessionActive = !process.env.CI && !process.env.GITHUB_ACTIONS;
+    coregraphicsReady = true;
+  }
 
   // Detect ZCode app & plugin directories safely
   let zcodeInstalled = false;
@@ -70,10 +108,25 @@ export async function runDoctor(): Promise<DoctorReport> {
   const mcpValid = TOOLS_MANIFEST.length >= 25;
 
   const overallHealthy = runtimeValid && osSupported && mcpValid;
+  const coreReady = overallHealthy;
+
+  const missingRealGui: string[] = [];
+  if (process.platform !== "darwin") missingRealGui.push("darwin");
+  if (!guiSessionActive) missingRealGui.push("interactive_gui");
+  if (!windowServerAlive) missingRealGui.push("window_server");
+  if (!perms.accessibility) missingRealGui.push("accessibility");
+  if (!perms.screen_recording) missingRealGui.push("screen_recording");
+  if (!coregraphicsReady) missingRealGui.push("coregraphics");
+  if (!texteditAvailable) missingRealGui.push("textedit");
+
+  const realGuiReady = coreReady && missingRealGui.length === 0;
 
   return {
     timestamp: new Date().toISOString(),
-    overall_healthy: overallHealthy,
+    overall_healthy: coreReady,
+    core_ready: coreReady,
+    real_gui_ready: realGuiReady,
+    missing_real_gui_prereqs: missingRealGui,
     checks: {
       runtime: {
         node_version: process.versions.node,
@@ -87,6 +140,12 @@ export async function runDoctor(): Promise<DoctorReport> {
       permissions: {
         accessibility: perms.accessibility,
         screen_recording: perms.screen_recording,
+      },
+      environment: {
+        gui_session: guiSessionActive,
+        window_server: windowServerAlive,
+        coregraphics_ready: coregraphicsReady,
+        textedit_available: texteditAvailable,
       },
       zcode_integration: {
         installed: zcodeInstalled,

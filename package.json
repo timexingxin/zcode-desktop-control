@@ -7,9 +7,12 @@
   "scripts": {
     "build": "pnpm --recursive --filter \"./packages/*\" run build",
     "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs",
+    "test:e2e:real": "pnpm run doctor --require-real-gui && node scripts/run-tests.mjs --real-gui",
     "typecheck": "pnpm --recursive --filter \"./packages/*\" run typecheck",
     "lint": "node scripts/lint.mjs",
     "clean": "pnpm --recursive --filter \"./packages/*\" run clean 2>/dev/null || true",
+    "cua": "node packages/cli/bin/cua.mjs",
     "doctor": "node packages/cli/bin/cua.mjs doctor",
     "smoke-test": "node scripts/smoke-test.mjs",
     "package:plugin": "node scripts/package-plugin.mjs",

@@ -10,7 +10,7 @@ let hasError = false;
 function scanDir(dir) {
   const entries = readdirSync(dir);
   for (const entry of entries) {
-    if (["node_modules", "dist", ".git", ".pnpm-store"].includes(entry)) continue;
+    if (["node_modules", "dist", ".git", ".pnpm-store", ".verification"].includes(entry)) continue;
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
