@@ -59,9 +59,26 @@ This matrix documents the actual runtime support level for each tool exposed by 
 | 40 | `doctor` (CLI) | **VERIFIED** | PARTIAL | PARTIAL | `tests/cli-doctor.test.mjs` | `cua doctor` CLI | `v0.2.0-alpha.1` |
 | 41 | `smoke-test` | **VERIFIED** | PARTIAL | PARTIAL | `scripts/smoke-test.mjs` | Stdio pipeline | `v0.2.0-alpha.1` |
 
+## Test Validation Matrix
+
+| Test Suite | Execution Environment | Verification Scope | Target Platforms | Command |
+| :--- | :--- | :--- | :--- | :--- |
+| **Unit, Protocol & Adversarial** (19 tests) | Headless CI & Local Terminal | Handle generation, tree pruning, diff engine, error taxonomy, MCP protocol negotiation, Red Team kill-switch/ambiguity guards | Ubuntu (x64), macOS (arm64/x64) | `pnpm test` / `pnpm test:unit` |
+| **CLI Environment Doctor** | Interactive or CLI Session | Node.js version, OS support, Accessibility permissions, WindowServer status, CoreGraphics, TextEdit readiness | macOS (arm64/x64) | `pnpm doctor` |
+| **Real GUI E2E Test** (`gui-e2e-textedit`) | Interactive Aqua GUI Session | End-to-end launch of TextEdit, AX focus, live handle resolution, CoreGraphics keyboard input, clipboard synchronization | macOS Apple Silicon (arm64 physical hardware) | `pnpm test:e2e:real` |
+
+---
+
+## Hardware Verification Notes
+
+- **macOS (Apple Silicon arm64)**: **VERIFIED**. Complete suite tested on physical Apple Silicon hardware with native Aqua GUI session and Accessibility permissions.
+- **macOS (Intel x64)**: **IMPLEMENTED / CI-BUILDABLE**. Architecture is platform-agnostic for Darwin and builds/passes unit tests on Intel runners; physical execution on x64 Mac hardware has not been physically validated.
+- **Windows & Linux**: **EXPERIMENTAL / SKELETON**. Throws `UnsupportedPlatformError` on unverified execution to guarantee zero fake-success.
+
 ---
 
 ## Truthfulness Guarantees
 1. Any tool invoked on Windows or Linux that is labeled `EXPERIMENTAL` **throws `UnsupportedPlatformError`** rather than returning fake success receipts.
 2. The `get_capabilities` tool allows any agent to inspect feature availability before executing instructions.
 3. Automated regression tests on macOS verify that the operating system state actually mutated (e.g. text appeared in TextEdit, clipboard contents altered), rather than merely testing `ok: true`.
+4. Headless CI runs strictly bypass interactive GUI tests (`SKIPPED: NO_ACTIVE_GUI_SESSION` or segregated via `scripts/run-tests.mjs`) to avoid false-green passes or focus-stealing hangs.

@@ -7,6 +7,8 @@
   "scripts": {
     "build": "pnpm --recursive --filter \"./packages/*\" run build",
     "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs",
+    "test:e2e:real": "pnpm doctor && node scripts/run-tests.mjs --real-gui",
     "typecheck": "pnpm --recursive --filter \"./packages/*\" run typecheck",
     "lint": "node scripts/lint.mjs",
     "clean": "pnpm --recursive --filter \"./packages/*\" run clean 2>/dev/null || true",

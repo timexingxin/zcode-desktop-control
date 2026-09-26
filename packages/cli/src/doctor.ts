@@ -20,6 +20,12 @@ export interface DoctorReport {
       accessibility: boolean;
       screen_recording: boolean;
     };
+    environment: {
+      gui_session: boolean;
+      window_server: boolean;
+      coregraphics_ready: boolean;
+      textedit_available: boolean;
+    };
     zcode_integration: {
       installed: boolean;
       app_path?: string;
@@ -38,6 +44,35 @@ export async function runDoctor(): Promise<DoctorReport> {
     accessibility: false,
     screen_recording: false,
   }));
+
+  // Check GUI session, WindowServer, TextEdit, CoreGraphics
+  let windowServerAlive = false;
+  let guiSessionActive = false;
+  let coregraphicsReady = false;
+  let texteditAvailable = false;
+
+  if (process.platform === "darwin") {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      try {
+        execFileSync("pgrep", ["-x", "WindowServer"]);
+        windowServerAlive = true;
+      } catch (_) {}
+
+      guiSessionActive = windowServerAlive && !process.env.CI && !process.env.GITHUB_ACTIONS;
+
+      const textEditCandidates = [
+        "/System/Applications/TextEdit.app",
+        "/Applications/TextEdit.app",
+        join(homedir(), "Applications/TextEdit.app"),
+      ];
+      texteditAvailable = textEditCandidates.some((p) => existsSync(p));
+      coregraphicsReady = windowServerAlive;
+    } catch (_) {}
+  } else {
+    guiSessionActive = !process.env.CI && !process.env.GITHUB_ACTIONS;
+    coregraphicsReady = true;
+  }
 
   // Detect ZCode app & plugin directories safely
   let zcodeInstalled = false;
@@ -87,6 +122,12 @@ export async function runDoctor(): Promise<DoctorReport> {
       permissions: {
         accessibility: perms.accessibility,
         screen_recording: perms.screen_recording,
+      },
+      environment: {
+        gui_session: guiSessionActive,
+        window_server: windowServerAlive,
+        coregraphics_ready: coregraphicsReady,
+        textedit_available: texteditAvailable,
       },
       zcode_integration: {
         installed: zcodeInstalled,

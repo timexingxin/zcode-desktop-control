@@ -9,12 +9,18 @@ const execFile = promisify(execFileCb);
 
 test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed verification", async (t) => {
   if (process.platform !== "darwin") {
-    t.skip("Real macOS GUI E2E is only supported on Darwin");
+    t.skip("SKIPPED: Real macOS GUI E2E is only supported on Darwin");
     return;
   }
 
   if (process.env.CI || process.env.GITHUB_ACTIONS) {
-    t.skip("Headless CI runner does not have an active Aqua GUI window server session");
+    t.skip("SKIPPED: Headless CI runner does not have an active Aqua GUI window server session");
+    return;
+  }
+
+  const hasWindowServer = await execFile("pgrep", ["-x", "WindowServer"]).then(() => true).catch(() => false);
+  if (!hasWindowServer) {
+    t.skip("SKIPPED: NO_ACTIVE_GUI_SESSION (WindowServer process not detected)");
     return;
   }
 
@@ -22,18 +28,21 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
   const server = new MCPServer(adapter);
 
   // 1. Check permissions first
-  const perms = await adapter.checkPermissions();
+  const perms = await adapter.checkPermissions().catch(() => ({ accessibility: false, screen_recording: false }));
   if (!perms.accessibility) {
-    t.skip("Skipping GUI E2E: Accessibility permission not granted in current environment");
+    t.skip("SKIPPED: ACCESSIBILITY_PERMISSION_REQUIRED");
     return;
   }
 
   const testToken = `ZCODE_VERIFY_${Date.now()}`;
 
   try {
-    // 2. Launch TextEdit and ensure a new document is open
+    // 2. Launch TextEdit and ensure a new activated document is open
     await adapter.launchApp("TextEdit", true);
-    await execFile("osascript", ["-e", 'tell application "TextEdit" to make new document']);
+    await execFile("osascript", [
+      "-e",
+      'tell application "TextEdit" to activate\ntell application "TextEdit" to make new document',
+    ]);
     await new Promise((r) => setTimeout(r, 600));
 
     // 3. Observe initial state via get_app_state
