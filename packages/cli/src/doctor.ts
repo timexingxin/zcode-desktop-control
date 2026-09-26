@@ -6,6 +6,9 @@ import { createPlatformAdapter, TOOLS_MANIFEST } from "@zcode-community/mcp-serv
 export interface DoctorReport {
   timestamp: string;
   overall_healthy: boolean;
+  core_ready: boolean;
+  real_gui_ready: boolean;
+  missing_real_gui_prereqs: string[];
   checks: {
     runtime: {
       node_version: string;
@@ -105,10 +108,25 @@ export async function runDoctor(): Promise<DoctorReport> {
   const mcpValid = TOOLS_MANIFEST.length >= 25;
 
   const overallHealthy = runtimeValid && osSupported && mcpValid;
+  const coreReady = overallHealthy;
+
+  const missingRealGui: string[] = [];
+  if (process.platform !== "darwin") missingRealGui.push("darwin");
+  if (!guiSessionActive) missingRealGui.push("interactive_gui");
+  if (!windowServerAlive) missingRealGui.push("window_server");
+  if (!perms.accessibility) missingRealGui.push("accessibility");
+  if (!perms.screen_recording) missingRealGui.push("screen_recording");
+  if (!coregraphicsReady) missingRealGui.push("coregraphics");
+  if (!texteditAvailable) missingRealGui.push("textedit");
+
+  const realGuiReady = coreReady && missingRealGui.length === 0;
 
   return {
     timestamp: new Date().toISOString(),
-    overall_healthy: overallHealthy,
+    overall_healthy: coreReady,
+    core_ready: coreReady,
+    real_gui_ready: realGuiReady,
+    missing_real_gui_prereqs: missingRealGui,
     checks: {
       runtime: {
         node_version: process.versions.node,

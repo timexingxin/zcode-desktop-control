@@ -4,35 +4,23 @@ import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import { MacOSAdapter } from "../packages/platform-macos/dist/index.js";
 import { MCPServer } from "../packages/mcp-server/dist/index.js";
+import { runDoctor } from "../packages/cli/dist/index.js";
 
 const execFile = promisify(execFileCb);
 
 test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed verification", async (t) => {
-  if (process.platform !== "darwin") {
-    t.skip("SKIPPED: Real macOS GUI E2E is only supported on Darwin");
-    return;
-  }
+  const isRealGuiRequested = process.argv.includes("--real-gui") || process.env.RUN_REAL_GUI_E2E === "1";
 
-  if (process.env.CI || process.env.GITHUB_ACTIONS) {
-    t.skip("SKIPPED: Headless CI runner does not have an active Aqua GUI window server session");
-    return;
-  }
-
-  const hasWindowServer = await execFile("pgrep", ["-x", "WindowServer"]).then(() => true).catch(() => false);
-  if (!hasWindowServer) {
-    t.skip("SKIPPED: NO_ACTIVE_GUI_SESSION (WindowServer process not detected)");
+  const doctor = await runDoctor();
+  if (isRealGuiRequested && !doctor.real_gui_ready) {
+    assert.fail(`Strict Preflight Failed: real GUI automation prerequisites not satisfied: ${doctor.missing_real_gui_prereqs.join(", ")}`);
+  } else if (!doctor.real_gui_ready) {
+    t.skip(`SKIPPED: Real GUI automation prerequisites not satisfied: ${doctor.missing_real_gui_prereqs.join(", ")}`);
     return;
   }
 
   const adapter = new MacOSAdapter();
   const server = new MCPServer(adapter);
-
-  // 1. Check permissions first
-  const perms = await adapter.checkPermissions().catch(() => ({ accessibility: false, screen_recording: false }));
-  if (!perms.accessibility) {
-    t.skip("SKIPPED: ACCESSIBILITY_PERMISSION_REQUIRED");
-    return;
-  }
 
   const testToken = `ZCODE_VERIFY_${Date.now()}`;
 
@@ -54,6 +42,10 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
     const initialState = JSON.parse(initialCall.content[0].text);
     assert.ok(initialState.state_id, "State must have valid state_id");
     assert.ok(initialState.tree.length > 0, "AX tree must contain elements");
+
+    // Ensure TextEdit has frontmost window focus before typing
+    await adapter.focusApp({ name: "TextEdit" });
+    await new Promise((r) => setTimeout(r, 200));
 
     // 4. Type unique test token into TextEdit
     const typeCall = await server.handleCallTool("type_text", {
