@@ -92,7 +92,8 @@ pnpm doctor
 # 4. Run automated test suite (unit, protocol, and adversarial tests)
 pnpm test
 
-# 5. Run real GUI E2E validation on macOS (requires interactive Aqua session & Accessibility permission)
+# 5. Run real GUI E2E validation on macOS (requires an interactive Aqua session,
+# Accessibility, Screen Recording, and TextEdit Automation permissions)
 pnpm test:e2e:real
 ```
 
@@ -145,7 +146,7 @@ Compatible with:
 
 | Platform | Automation Layer | Runtime Status | Zero Fake-Success Guarantee |
 | :--- | :--- | :---: | :--- |
-| **macOS (Apple Silicon arm64)** | Native AX, CoreGraphics, screencapture | **VERIFIED** | Real CoreGraphics events, verified on physical hardware via TextEdit E2E |
+| **macOS (Apple Silicon arm64)** | Native AX, CoreGraphics, screencapture | **IMPLEMENTED**; physical E2E is a separate gate | Real TextEdit E2E must pass on the current checkout before its covered actions are called verified |
 | **macOS (Intel x64)** | Native AX, CoreGraphics, screencapture | **IMPLEMENTED** | CI-buildable and unit-tested; physical Intel hardware run unverified |
 | **Windows (x64)** | Windows UI Automation & PowerShell | **EXPERIMENTAL** | Unverified actions throw `UnsupportedPlatformError` |
 | **Linux (X11 / Wayland)** | AT-SPI2 / Portal | **EXPERIMENTAL** | Unverified actions throw `UnsupportedPlatformError` |

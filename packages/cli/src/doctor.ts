@@ -28,6 +28,8 @@ export interface DoctorReport {
       window_server: boolean;
       coregraphics_ready: boolean;
       textedit_available: boolean;
+      textedit_automation_checked: boolean;
+      textedit_automation: boolean;
     };
     zcode_integration: {
       installed: boolean;
@@ -41,7 +43,7 @@ export interface DoctorReport {
   };
 }
 
-export async function runDoctor(): Promise<DoctorReport> {
+export async function runDoctor(options: { probeTextEditAutomation?: boolean } = {}): Promise<DoctorReport> {
   const adapter = createPlatformAdapter();
   const perms = await adapter.checkPermissions().catch(() => ({
     accessibility: false,
@@ -53,16 +55,24 @@ export async function runDoctor(): Promise<DoctorReport> {
   let guiSessionActive = false;
   let coregraphicsReady = false;
   let texteditAvailable = false;
+  let texteditAutomation = false;
 
   if (process.platform === "darwin") {
     try {
       const { execFileSync } = await import("node:child_process");
       try {
-        execFileSync("pgrep", ["-x", "WindowServer"]);
+        execFileSync("pgrep", ["-x", "WindowServer"], { stdio: "ignore", timeout: 3000 });
         windowServerAlive = true;
       } catch (_) {}
 
-      guiSessionActive = windowServerAlive && !process.env.CI && !process.env.GITHUB_ACTIONS;
+      const sessionJson = execFileSync("osascript", [
+        "-l", "JavaScript", "-e",
+        'ObjC.import("ApplicationServices"); ObjC.import("CoreGraphics"); const s = $.CGSessionCopyCurrentDictionary(); const session = s ? ObjC.deepUnwrap(ObjC.castRefToObject(s)) : {}; const display = $.CGMainDisplayID(); JSON.stringify({ onConsole: session.kCGSSessionOnConsoleKey === true, loginDone: session.kCGSessionLoginDoneKey === true, uid: session.kCGSSessionUserIDKey, width: Number($.CGDisplayPixelsWide(display)), height: Number($.CGDisplayPixelsHigh(display)) })',
+      ], { encoding: "utf8", timeout: 5000 });
+      const session = JSON.parse(sessionJson);
+      guiSessionActive = windowServerAlive && session.onConsole && session.loginDone &&
+        session.uid === process.getuid?.() && !process.env.CI && !process.env.GITHUB_ACTIONS;
+      coregraphicsReady = session.width > 0 && session.height > 0;
 
       const textEditCandidates = [
         "/System/Applications/TextEdit.app",
@@ -70,11 +80,24 @@ export async function runDoctor(): Promise<DoctorReport> {
         join(homedir(), "Applications/TextEdit.app"),
       ];
       texteditAvailable = textEditCandidates.some((p) => existsSync(p));
-      coregraphicsReady = windowServerAlive;
     } catch (_) {}
   } else {
     guiSessionActive = !process.env.CI && !process.env.GITHUB_ACTIONS;
     coregraphicsReady = true;
+  }
+
+  // Apple Events automation is a separate macOS permission from Accessibility.
+  // Probe only for strict real-GUI runs: this check can display an OS consent
+  // prompt, so routine `doctor` must not launch or control TextEdit.
+  if (process.platform === "darwin" && texteditAvailable && options.probeTextEditAutomation &&
+      guiSessionActive && coregraphicsReady && perms.accessibility && perms.screen_recording) {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("osascript", ["-e", 'tell application id "com.apple.TextEdit" to get count of documents'], {
+        stdio: "ignore", timeout: 5000,
+      });
+      texteditAutomation = true;
+    } catch (_) {}
   }
 
   // Detect ZCode app & plugin directories safely
@@ -118,6 +141,8 @@ export async function runDoctor(): Promise<DoctorReport> {
   if (!perms.screen_recording) missingRealGui.push("screen_recording");
   if (!coregraphicsReady) missingRealGui.push("coregraphics");
   if (!texteditAvailable) missingRealGui.push("textedit");
+  if (!options.probeTextEditAutomation) missingRealGui.push("textedit_automation_unchecked");
+  else if (!texteditAutomation) missingRealGui.push("textedit_automation");
 
   const realGuiReady = coreReady && missingRealGui.length === 0;
 
@@ -146,6 +171,8 @@ export async function runDoctor(): Promise<DoctorReport> {
         window_server: windowServerAlive,
         coregraphics_ready: coregraphicsReady,
         textedit_available: texteditAvailable,
+        textedit_automation_checked: Boolean(options.probeTextEditAutomation),
+        textedit_automation: texteditAutomation,
       },
       zcode_integration: {
         installed: zcodeInstalled,

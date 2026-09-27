@@ -5,12 +5,11 @@ import { MCPServer, createPlatformAdapter } from "@zcode-community/mcp-server";
 import { runDoctor } from "./doctor.js";
 
 function getCliVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
-    return pkg.version || "0.2.0-alpha.1";
-  } catch {
-    return "0.2.0-alpha.1";
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
+  if (typeof pkg.version !== "string" || !pkg.version) {
+    throw new Error("CLI package metadata has no version");
   }
+  return pkg.version;
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -20,7 +19,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     case "doctor": {
       const isJson = argv.includes("--json");
       const requireRealGui = argv.includes("--require-real-gui");
-      const report = await runDoctor();
+      const report = await runDoctor({ probeTextEditAutomation: requireRealGui });
       if (isJson) {
         console.log(JSON.stringify(report, null, 2));
         if (requireRealGui && !report.real_gui_ready) {
@@ -44,6 +43,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       console.log(`[${report.checks.environment.window_server ? "PASS" : "WARN"}] WindowServer: ${report.checks.environment.window_server ? "Running" : "Not detected"}`);
       console.log(`[${report.checks.environment.coregraphics_ready ? "PASS" : "WARN"}] CoreGraphics Display: ${report.checks.environment.coregraphics_ready ? "Ready" : "Unavailable"}`);
       console.log(`[${report.checks.environment.textedit_available ? "PASS" : "INFO"}] TextEdit Availability: ${report.checks.environment.textedit_available ? "Available (Ready for GUI E2E)" : "Not Found"}`);
+      console.log(`[${report.checks.environment.textedit_automation ? "PASS" : "INFO"}] TextEdit Automation: ${report.checks.environment.textedit_automation ? "Allowed" : report.checks.environment.textedit_automation_checked ? "Unavailable or denied" : "Not checked (strict GUI mode only)"}`);
       console.log(`[${report.checks.zcode_integration.installed ? "PASS" : "INFO"}] ZCode Integration: ${report.checks.zcode_integration.installed ? `Detected (${report.checks.zcode_integration.app_path})` : "Standalone Mode (ZCode app not detected)"}`);
       console.log(`[${report.checks.mcp.available ? "PASS" : "FAIL"}] MCP Tool Registry: ${report.checks.mcp.tools_count} standard tools loaded\n`);
 

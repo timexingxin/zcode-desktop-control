@@ -44,3 +44,6 @@ jobs:
 
       - name: Run code linter
         run: pnpm run lint
+
+      - name: Package and verify isolated MCP plugin
+        run: pnpm run package:plugin

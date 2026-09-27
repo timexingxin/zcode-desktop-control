@@ -8,10 +8,10 @@ import { runDoctor } from "../packages/cli/dist/index.js";
 
 const execFile = promisify(execFileCb);
 
-test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed verification", async (t) => {
+test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed verification", { timeout: 60000 }, async (t) => {
   const isRealGuiRequested = process.argv.includes("--real-gui") || process.env.RUN_REAL_GUI_E2E === "1";
 
-  const doctor = await runDoctor();
+  const doctor = await runDoctor({ probeTextEditAutomation: isRealGuiRequested });
   if (isRealGuiRequested && !doctor.real_gui_ready) {
     assert.fail(`Strict Preflight Failed: real GUI automation prerequisites not satisfied: ${doctor.missing_real_gui_prereqs.join(", ")}`);
   } else if (!doctor.real_gui_ready) {
@@ -23,14 +23,17 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
   const server = new MCPServer(adapter);
 
   const testToken = `ZCODE_VERIFY_${Date.now()}`;
+  let createdDocumentId;
 
   try {
     // 2. Launch TextEdit and ensure a new activated document is open
     await adapter.launchApp("TextEdit", true);
-    await execFile("osascript", [
+    const { stdout: documentId } = await execFile("osascript", [
       "-e",
-      'tell application "TextEdit" to activate\ntell application "TextEdit" to make new document',
-    ]);
+      'tell application "TextEdit" to activate\ntell application "TextEdit" to return id of (make new document)',
+    ], { timeout: 15000 });
+    createdDocumentId = documentId.trim();
+    assert.match(createdDocumentId, /^\d+$/, "New TextEdit document must have an addressable id");
     await new Promise((r) => setTimeout(r, 600));
 
     // 3. Observe initial state via get_app_state
@@ -59,8 +62,8 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
     // 5. Re-observe TextEdit state and verify OS state actually changed
     const { stdout: textEditContent } = await execFile("osascript", [
       "-e",
-      'tell application "TextEdit" to return text of document 1',
-    ]);
+      `tell application "TextEdit" to return text of document id ${createdDocumentId}`,
+    ], { timeout: 15000 });
 
     assert.ok(
       textEditContent.includes(testToken),
@@ -76,12 +79,15 @@ test("macOS Real GUI E2E: TextEdit observe -> act -> re-observe -> state changed
     assert.equal(readData.text, `CLIP_${testToken}`, "Clipboard content must match written text");
 
   } finally {
-    // Clean up: Close TextEdit document without saving and quit
-    try {
-      await execFile("osascript", [
-        "-e",
-        'tell application "TextEdit" to close every document saving no\ntell application "TextEdit" to quit saving no',
-      ]);
-    } catch (_) {}
+    // Only close the document created by this test. Preserve the user's other
+    // TextEdit documents and the application's original running state.
+    if (createdDocumentId && /^\d+$/.test(createdDocumentId)) {
+      try {
+        await execFile("osascript", [
+          "-e",
+          `tell application "TextEdit" to close document id ${createdDocumentId} saving no`,
+        ], { timeout: 10000 });
+      } catch (_) {}
+    }
   }
 });

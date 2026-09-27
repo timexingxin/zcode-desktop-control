@@ -835,22 +835,31 @@ export class MacOSAdapter implements PlatformAdapter {
   }
 
   async checkPermissions(): Promise<PermissionReport> {
+    let accessibility = false;
+    let screenRecording = false;
     try {
       const { stdout } = await execFile("osascript", [
         "-e",
         'tell application "System Events" to return count of processes',
-      ]);
-      const canAccessAX = parseInt(stdout.trim(), 10) > 0;
-      return {
-        accessibility: canAccessAX,
-        screen_recording: true,
-      };
-    } catch {
-      return {
-        accessibility: false,
-        screen_recording: false,
-      };
-    }
+      ], { timeout: 10000 });
+      const { stdout: trusted } = await execFile("osascript", [
+        "-l", "JavaScript", "-e",
+        'ObjC.import("ApplicationServices"); Boolean($.AXIsProcessTrusted())',
+      ], { timeout: 10000 });
+      accessibility = parseInt(stdout.trim(), 10) > 0 && trusted.trim() === "true";
+    } catch { /* Unknown permission state fails closed. */ }
+
+    // CGPreflightScreenCaptureAccess does not request permission. A missing
+    // Swift toolchain leaves the strict GUI preflight unready rather than
+    // reporting a permission that was never checked.
+    try {
+      const { stdout } = await execFile("/usr/bin/swift", [
+        "-e", 'import CoreGraphics; print(CGPreflightScreenCaptureAccess() ? "granted" : "denied")',
+      ], { timeout: 20000 });
+      screenRecording = stdout.trim() === "granted";
+    } catch { /* Unknown permission state fails closed. */ }
+
+    return { accessibility, screen_recording: screenRecording };
   }
 
   async requestAccess(_types?: ("accessibility" | "screen_recording")[]): Promise<PermissionReport> {

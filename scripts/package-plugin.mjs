@@ -1,11 +1,43 @@
 #!/usr/bin/env node
-import { cpSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
-const rootDir = resolve(new URL(".", import.meta.url).pathname, "..");
+const rootDir = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const pluginDir = join(rootDir, "plugin");
+
+function runPnpm(args) {
+  const entry = process.env.npm_execpath;
+  if (entry && /\.(?:c|m)?js$/i.test(entry)) {
+    execFileSync(process.execPath, [entry, ...args], { cwd: rootDir, stdio: "inherit" });
+  } else {
+    execFileSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", args, {
+      cwd: rootDir, stdio: "inherit", shell: process.platform === "win32",
+    });
+  }
+}
+
+function createZip(source, destination) {
+  if (process.platform === "win32") {
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::CreateFromDirectory($env:ZCODE_ZIP_SOURCE, $env:ZCODE_ZIP_DEST)',
+    ], { env: { ...process.env, ZCODE_ZIP_SOURCE: source, ZCODE_ZIP_DEST: destination } });
+  } else {
+    execFileSync("zip", ["-r", "-q", destination, "."], { cwd: source });
+  }
+}
+
+function extractZip(source, destination) {
+  if (process.platform === "win32") {
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory($env:ZCODE_ZIP_SOURCE, $env:ZCODE_ZIP_DEST)',
+    ], { env: { ...process.env, ZCODE_ZIP_SOURCE: source, ZCODE_ZIP_DEST: destination } });
+  } else {
+    execFileSync("unzip", ["-q", source, "-d", destination]);
+  }
+}
 
 console.log("=========================================");
 console.log(" Packaging ZCode Plugin (Self-Contained) ");
@@ -13,7 +45,7 @@ console.log("=========================================");
 
 // 1. Ensure packages are built
 console.log("[1/5] Building monorepo packages...");
-execFileSync("pnpm", ["run", "build"], { cwd: rootDir, stdio: "inherit" });
+runPnpm(["run", "build"]);
 
 // 2. Prepare plugin dist directory
 console.log("[2/5] Assembling self-contained plugin runtime...");
@@ -55,7 +87,7 @@ mkdirSync(distDir, { recursive: true });
 const zipPath = join(distDir, "zcode-desktop-control.zip");
 rmSync(zipPath, { force: true });
 
-execFileSync("zip", ["-r", "-q", zipPath, "."], { cwd: pluginDir });
+createZip(pluginDir, zipPath);
 console.log(`[PASS] Created: ${zipPath}`);
 
 // 5. Clean test install in /tmp
@@ -64,7 +96,7 @@ const testExtractDir = join(tmpdir(), `zcode-plugin-test-${Date.now()}`);
 mkdirSync(testExtractDir, { recursive: true });
 
 try {
-  execFileSync("unzip", ["-q", zipPath, "-d", testExtractDir]);
+  extractZip(zipPath, testExtractDir);
   const extractedServer = join(testExtractDir, "dist", "bin", "server.js");
 
   if (!existsSync(extractedServer)) {
@@ -72,29 +104,41 @@ try {
   }
 
   // Launch isolated stdio MCP server from temp directory
-  const child = spawn("node", [extractedServer], {
+  const child = spawn(process.execPath, [extractedServer], {
     cwd: testExtractDir,
     env: { ...process.env, ZCODE_PLUGIN_ROOT: testExtractDir },
     stdio: ["pipe", "pipe", "pipe"],
   });
 
   const responsePromise = new Promise((resolve, reject) => {
-    let raw = "";
+    let pending = "";
+    const timeout = setTimeout(() => reject(new Error("Timeout waiting for MCP initialize/tools/list response")), 10000);
+    const fail = (error) => { clearTimeout(timeout); reject(error); };
     child.stdout.on("data", (data) => {
-      raw += data.toString("utf8");
-      const lines = raw.split("\n");
+      pending += data.toString("utf8");
+      const lines = pending.split("\n");
+      pending = lines.pop() || "";
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
           const parsed = JSON.parse(line.trim());
-          if (parsed.result && parsed.result.protocolVersion) {
-            resolve(parsed);
+          if (parsed.id === 1 && parsed.result?.protocolVersion) {
+            console.log(`[PASS] Isolated MCP initialize: protocolVersion=${parsed.result.protocolVersion}`);
+            child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+            child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }) + "\n");
+          } else if (parsed.id === 2) {
+            if (!Array.isArray(parsed.result?.tools) || parsed.result.tools.length === 0) {
+              fail(new Error("Isolated MCP tools/list returned no tools"));
+            } else {
+              clearTimeout(timeout);
+              resolve(parsed.result.tools.length);
+            }
           }
         } catch (_) {}
       }
     });
-    child.on("error", reject);
-    setTimeout(() => reject(new Error("Timeout waiting for MCP handshake response")), 5000);
+    child.on("error", fail);
+    child.on("close", () => fail(new Error("Isolated MCP server exited before tools/list")));
   });
 
   const initReq = JSON.stringify({
@@ -110,10 +154,10 @@ try {
 
   child.stdin.write(initReq);
 
-  const initRes = await responsePromise;
-  console.log(`[PASS] Isolated clean MCP handshake response: protocolVersion=${initRes.result.protocolVersion}`);
+  const toolsCount = await responsePromise;
+  console.log(`[PASS] Isolated MCP tools/list: ${toolsCount} tools`);
   child.kill();
-  console.log("[SUCCESS] Plugin package is 100% self-contained and functions independently of repo!");
+  console.log("[SUCCESS] Plugin package initializes and lists tools outside the repository.");
 } finally {
   rmSync(testExtractDir, { recursive: true, force: true });
 }
