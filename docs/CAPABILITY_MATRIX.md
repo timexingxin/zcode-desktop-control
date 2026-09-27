@@ -21,7 +21,7 @@ This matrix documents the actual runtime support level for each tool exposed by 
 | 2 | `list_apps` | **VERIFIED** | EXPERIMENTAL | EXPERIMENTAL | `scripts/smoke-test.mjs` | `cua list-apps` CLI | `v0.2.0-alpha.1` |
 | 3 | `list_windows` | **IMPLEMENTED** (CGWindowID) | EXPERIMENTAL | EXPERIMENTAL | `tests/core-handles-reducer.test.mjs` | Native Quartz test | `v0.2.0-alpha.1` |
 | 4 | `get_active_window` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/core-handles-reducer.test.mjs` | System Events | `v0.2.0-alpha.1` |
-| 5 | `get_app_state` | **IMPLEMENTED** (Full & Compact) | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | TextEdit & Finder AX | `v0.2.0-alpha.1` |
+| 5 | `get_app_state` | **VERIFIED** (full TextEdit path); compact IMPLEMENTED | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | TextEdit AX | `v0.2.0-alpha.1` |
 | 6 | `screenshot` | **IMPLEMENTED** (PNG IHDR) | EXPERIMENTAL | EXPERIMENTAL | No physical assertion | `screencapture` | `v0.2.0-alpha.1` |
 | 7 | `get_screen_info` | **IMPLEMENTED** (CoreGraphics) | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | Native display check | `v0.2.0-alpha.1` |
 | 8 | `click` / `left_click` | **IMPLEMENTED** (CoreGraphics) | EXPERIMENTAL | EXPERIMENTAL | No physical assertion | Native mouse dispatch | `v0.2.0-alpha.1` |
@@ -34,14 +34,14 @@ This matrix documents the actual runtime support level for each tool exposed by 
 | 15 | `left_click_drag` | **IMPLEMENTED** (Dragged event) | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | CoreGraphics | `v0.2.0-alpha.1` |
 | 16 | `mouse_down` / `left_mouse_down`| **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | CoreGraphics | `v0.2.0-alpha.1` |
 | 17 | `mouse_up` / `left_mouse_up` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | CoreGraphics | `v0.2.0-alpha.1` |
-| 18 | `type_text` / `type` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | TextEdit verified | `v0.2.0-alpha.1` |
-| 19 | `press_key` / `key` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | Key code mapping | `v0.2.0-alpha.1` |
+| 18 | `type_text` / `type` | **VERIFIED** | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | TextEdit text and saved bytes | `v0.2.0-alpha.1` |
+| 19 | `press_key` / `key` | **VERIFIED** (Command-S path) | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | Saved TextEdit file | `v0.2.0-alpha.1` |
 | 20 | `hotkey` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | Key combinations | `v0.2.0-alpha.1` |
 | 21 | `hold_key` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/mcp-protocol.test.mjs` | System Events | `v0.2.0-alpha.1` |
 | 22 | `set_value` | **IMPLEMENTED** (Live Resolver) | EXPERIMENTAL | EXPERIMENTAL | No physical assertion | AXValue / TextEdit | `v0.2.0-alpha.1` |
 | 23 | `select_text` | UNSUPPORTED | UNSUPPORTED | UNSUPPORTED | `tests/mcp-protocol.test.mjs` | Throws structured error | `v0.2.0-alpha.1` |
-| 24 | `launch_app` / `open_application`| **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | `open -a` | `v0.2.0-alpha.1` |
-| 25 | `focus_app` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | `tests/gui-e2e-textedit.test.mjs` | `activate` | `v0.2.0-alpha.1` |
+| 24 | `launch_app` / `open_application`| **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | No adapter assertion | `open -a` implementation | `v0.2.0-alpha.1` |
+| 25 | `focus_app` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | No physical assertion | `activate` implementation | `v0.2.0-alpha.1` |
 | 26 | `focus_window` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | Unit test | Quartz | `v0.2.0-alpha.1` |
 | 27 | `move_window` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | Unit test | System Events | `v0.2.0-alpha.1` |
 | 28 | `resize_window` | **IMPLEMENTED** | EXPERIMENTAL | EXPERIMENTAL | Unit test | System Events | `v0.2.0-alpha.1` |
@@ -59,21 +59,21 @@ This matrix documents the actual runtime support level for each tool exposed by 
 | 40 | `doctor` (CLI) | **VERIFIED** | PARTIAL | PARTIAL | `tests/cli-doctor.test.mjs` | `cua doctor` CLI | `v0.2.0-alpha.1` |
 | 41 | `smoke-test` | **VERIFIED** | PARTIAL | PARTIAL | `scripts/smoke-test.mjs` | Stdio pipeline | `v0.2.0-alpha.1` |
 
-The TextEdit E2E exercises `get_app_state`, `type_text`, `launch_app`, `focus_app`, `read_clipboard`, and `write_clipboard`. It does not exercise screenshot, mouse actions, `set_value`, `click_element`, or `set_element_value`. Native actions remain **IMPLEMENTED** until the current physical test passes, and untested actions need dedicated physical regression coverage. Mock-adapter protocol tests verify routing and error handling, not CoreGraphics event delivery. The E2E changes the system clipboard and does not restore non-text clipboard data; run it only in a disposable interactive session.
+The TextEdit E2E passed locally on physical macOS arm64 with no skips. It exercises `get_app_state` (full tree), `type_text`, `press_key` (Command-S), `read_clipboard`, and `write_clipboard`. It opens the test file through LaunchServices, so it does not assert the adapter's `launch_app` or `focus_app`. It does not exercise screenshot, mouse actions, `set_value`, `click_element`, or `set_element_value`. Untested native actions need dedicated physical regression coverage. Mock-adapter protocol tests verify routing and error handling, not CoreGraphics event delivery. The E2E changes the system clipboard and does not restore non-text clipboard data; run it only in a disposable interactive session.
 
 ## Test Validation Matrix
 
 | Test Suite | Execution Environment | Verification Scope | Target Platforms | Command |
 | :--- | :--- | :--- | :--- | :--- |
 | **Unit, Protocol & Adversarial** (25 tests) | Headless CI & Local Terminal | Handle generation, tree pruning, diff engine, error taxonomy, MCP protocol negotiation, Red Team kill-switch/ambiguity guards | Ubuntu (x64), macOS (arm64/x64) | `pnpm test` / `pnpm test:unit` |
-| **CLI Environment Doctor** | Interactive or CLI Session | Node.js version, OS support, Accessibility and Screen Recording permissions, WindowServer, console session, display, and TextEdit availability; strict mode also checks TextEdit Automation | macOS (arm64/x64) | `pnpm doctor` / `pnpm doctor --require-real-gui` |
-| **Real GUI E2E Test** (`gui-e2e-textedit`) | Interactive Aqua GUI Session | End-to-end launch of TextEdit, AX focus, live handle resolution, CoreGraphics keyboard input, clipboard synchronization | macOS Apple Silicon (arm64 physical hardware) | `pnpm test:e2e:real` |
+| **CLI Environment Doctor** | Interactive or CLI Session | Node.js version, OS support, Accessibility and Screen Recording permissions, WindowServer, console session, display, and TextEdit availability | macOS (arm64/x64) | `pnpm doctor` / `pnpm doctor --require-real-gui` |
+| **Real GUI E2E Test** (`gui-e2e-textedit`) | Interactive Aqua GUI Session | Open dedicated temporary text file, observe AX tree, type through System Events, save, verify file bytes, and check clipboard roundtrip | macOS Apple Silicon (arm64 physical hardware) | `pnpm test:e2e:real` |
 
 ---
 
 ## Hardware Verification Notes
 
-- **macOS (Apple Silicon arm64)**: Native driver implemented. The current physical TextEdit E2E must pass on the exact tested checkout before claiming the GUI path is verified; a passing headless unit suite is insufficient.
+- **macOS (Apple Silicon arm64)**: The TextEdit file workflow passed a physical E2E on the current local checkout. This verifies the covered actions above; the rest of the native driver remains implemented without equivalent physical assertions.
 - **macOS (Intel x64)**: **IMPLEMENTED / CI-BUILDABLE**. Architecture is platform-agnostic for Darwin and builds/passes unit tests on Intel runners; physical execution on x64 Mac hardware has not been physically validated.
 - **Windows & Linux**: **EXPERIMENTAL / SKELETON**. Throws `UnsupportedPlatformError` on unverified execution to guarantee zero fake-success.
 
