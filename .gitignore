@@ -27,6 +27,7 @@ zcode-cua-*.sock
 coverage/
 .nyc_output/
 *.tmp
+.verification/
 
 # Environment & Secrets
 .env
