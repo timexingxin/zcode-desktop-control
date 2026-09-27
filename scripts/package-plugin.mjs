@@ -94,6 +94,8 @@ console.log(`[PASS] Created: ${zipPath}`);
 console.log("[5/5] Performing clean test installation outside repo in /tmp...");
 const testExtractDir = join(tmpdir(), `zcode-plugin-test-${Date.now()}`);
 mkdirSync(testExtractDir, { recursive: true });
+let child;
+let childClosed;
 
 try {
   extractZip(zipPath, testExtractDir);
@@ -104,11 +106,12 @@ try {
   }
 
   // Launch isolated stdio MCP server from temp directory
-  const child = spawn(process.execPath, [extractedServer], {
+  child = spawn(process.execPath, [extractedServer], {
     cwd: testExtractDir,
     env: { ...process.env, ZCODE_PLUGIN_ROOT: testExtractDir },
     stdio: ["pipe", "pipe", "pipe"],
   });
+  childClosed = new Promise((resolve) => child.once("close", resolve));
 
   const responsePromise = new Promise((resolve, reject) => {
     let pending = "";
@@ -156,8 +159,23 @@ try {
 
   const toolsCount = await responsePromise;
   console.log(`[PASS] Isolated MCP tools/list: ${toolsCount} tools`);
-  child.kill();
   console.log("[SUCCESS] Plugin package initializes and lists tools outside the repository.");
 } finally {
-  rmSync(testExtractDir, { recursive: true, force: true });
+  if (child) {
+    child.kill();
+    // Windows keeps the extracted server executable locked until the child
+    // emits `close`, even after kill() reports that termination was requested.
+    let closeTimeout;
+    try {
+      await Promise.race([
+        childClosed,
+        new Promise((_, reject) => {
+          closeTimeout = setTimeout(() => reject(new Error("Isolated MCP server did not close after termination")), 10000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(closeTimeout);
+    }
+  }
+  rmSync(testExtractDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
