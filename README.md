@@ -26,7 +26,7 @@ cua list-apps
 cua mcp
 ```
 
-For a 30–60 second step-by-step video script, see [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+For a 60–120 second real TextEdit demo storyboard, see [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 
 ---
 
@@ -44,7 +44,7 @@ Existing desktop automation tools for AI agents suffer from critical architectur
 
 ## 3. Key Features
 
-- **Accessibility-First (macOS Verified)**: Operates directly on native Accessibility (AX) trees. Actions are fast, pixel-accurate, and background-safe without stealing user focus.
+- **Accessibility-First (macOS TextEdit Workflow Verified)**: Operates directly on native Accessibility (AX) trees. The physically verified typing workflow uses a frontmost TextEdit test file; other actions and background operation require separate validation.
 - **Stable Element Handles V2**: Separates `StrongHandle` (derived from persistent `AXIdentifier` / `AutomationId`) and `WeakHandle` (derived from role hierarchy and semantic fingerprints without fragile sibling indices), complete with collision/ambiguity detection.
 - **Measured Context Compression**: Supports `detail="compact"` (pruning non-interactive noise) and `detail="diff"` (emitting only delta changes):
   - **Compact Mode**: Median **53.17%** character reduction (range: 51.37% ~ 80.11%).
