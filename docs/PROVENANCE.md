@@ -37,3 +37,19 @@ Each module in this repository is categorized under the following classification
    - Apple macOS Accessibility Protocol and System Events Scripting Interface.
    - Microsoft Windows UI Automation Specification.
    - Open source `zai-org/ZCode` repository documentation (Apache-2.0).
+
+## Historical Commit Attribution
+
+Three early commits record the author and committer email
+`106403213+timexingxin@users.noreply.github.com`. GitHub associates that
+account ID with `sntaputri2805`, so its contributor display attributes these
+commits to that account:
+
+- `c0cead14621a0be14ab15af28c6f2741789d1e51` — `feat(runtime): enforce zero fake-success, real macOS CoreGraphics, handle v2, and CI fix`
+- `f617b4550e5fe689bc5aaf26a93d4e14b937e16b` — `test: isolate platform adapter in adversarial test and skip GUI in headless CI`
+- `1c8136fc46618488754a9a2ddbd58b9d67d52ba6` — `ci: add cross-platform test runner and align pnpm versions`
+
+The recorded Git identity does not establish who personally authored the
+changes. Historical attribution remains ambiguous. The published Git objects
+are preserved, and no ownership claim or history rewrite is being made without
+sufficient evidence.
